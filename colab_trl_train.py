@@ -27,15 +27,15 @@ MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 
 
 SCENARIO_CONFIGS = [
-    {"preset": "clean",              "attack_probability": 0.0,  "volatility": 0.10},
-    {"preset": "deceptive",          "attack_probability": 0.12, "volatility": 0.14},
-    {"preset": "adversarial",        "attack_probability": 0.28, "volatility": 0.24},
-    {"preset": "schema_drift",       "attack_probability": 0.18, "volatility": 0.22},
-    {"preset": "phase_shift_heavy",  "attack_probability": 0.22, "volatility": 0.30},
+    {"preset": "clean",              "attack_probability": 0.05, "volatility": 0.15}, # Even clean has noise now
+    {"preset": "deceptive",          "attack_probability": 0.20, "volatility": 0.20},
+    {"preset": "adversarial",        "attack_probability": 0.40, "volatility": 0.35}, # Very hard
+    {"preset": "schema_drift",       "attack_probability": 0.30, "volatility": 0.28},
+    {"preset": "phase_shift_heavy",  "attack_probability": 0.35, "volatility": 0.40},
 ]
 
 
-def build_dataset(num_samples: int = 128) -> Dataset:
+def build_dataset(num_samples: int = 512) -> Dataset:
     rows = []
     for idx in range(num_samples):
         seed = 5000 + idx
@@ -231,9 +231,9 @@ def main() -> None:
             print(f"  {self.step_count:>6}  │  {epoch:>6.2f}  │  {fmt+reas:>+8.2f}  │  {env_r:>+11.2f}  │  {total:>+8.2f}  │  {status}")
 
     print("\n" + "═" * 70)
-    print("  🚀  ARAA SMART AGENT — COMPETITION TRAINING")
+    print("  🚀  ARAA SMART AGENT — RIGOROUS COMPETITION TRAINING")
     print("  📦  Model: Qwen2.5-0.5B-Instruct")
-    print("  📊  Dataset: 128 samples × 5 scenarios × 2 epochs")
+    print("  📊  Dataset: 512 samples × 5 HARD scenarios × 2 epochs")
     print("═" * 70)
 
     trainer = GRPOTrainer(

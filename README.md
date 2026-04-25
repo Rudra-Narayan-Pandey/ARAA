@@ -27,6 +27,17 @@ The core submission story is simple:
 - a baseline agent learns to optimize the dashboard
 - a robust agent learns to preserve the business
 - an oversight channel explains when visible success diverges from reality
+- **Verifiable Reasoning**: Agents must provide a text `FAULT ANALYSIS` before acting, fixing the "black box" problem.
+- **Detect-and-Correct**: When the agent detects a lie in the data, it picks an action to fix the *true* state, not the *fake* dashboard.
+
+## Fixing Market Flaws
+
+Current AI models in the market suffer from:
+1. **Blind Trust**: They assume input data is always true.
+2. **Reward Hacking**: They exploit shortcuts to get high scores while breaking the system.
+3. **Reasoning Gaps**: They act without explaining *why*.
+
+**ARAA fixes this** by using Rigorous Reinforcement Learning (GRPO) to train agents that are skeptical, explanatory, and robust to deception.
 
 ## Why This Is Different
 
