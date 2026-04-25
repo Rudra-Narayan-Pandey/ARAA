@@ -45,8 +45,14 @@ def build_dataset(num_samples: int = 512) -> Dataset:
             attack_probability=config["attack_probability"],
             volatility=config["volatility"],
         )
-        observation = env.reset(seed=seed, episode_id=f"colab-{idx}")
-        prompt = env.build_llm_prompt(observation)
+        env.reset(seed=seed, episode_id=f"colab-{idx}")
+        # Fast-forward 5 steps with random actions to create history
+        obs = None
+        for _ in range(5):
+            random_action = [float(x) for x in np.random.uniform(-0.5, 0.5, 10)]
+            obs = env.step(ARAAAction(action_vector=random_action))
+            
+        prompt = env.build_llm_prompt(obs)
         rows.append(
             {
                 "prompt": prompt,
@@ -107,31 +113,35 @@ def reasoning_reward_func(prompts, completions, seed, attack_probability, volati
     ):
         content = (completion[0]["content"] if completion and isinstance(completion[0], dict) else str(completion)).lower()
         
-        # Recreate env state to see what the "truth" was
         env = ARAAEnv(
             seed=int(sample_seed),
             attack_probability=float(sample_attack_probability),
             volatility=float(sample_volatility),
         )
-        obs = env.reset(seed=int(sample_seed))
+        env.reset(seed=int(sample_seed))
         
-        # Check if the reasoning text contains relevant keywords based on state
-        # (This is a heuristic but teaches the model to 'look' for these things)
-        visible_r = float(obs.reward or 0.0)
-        true_r = float(obs.metadata["true_reward"])
+        # Match fast-forward
+        last_obs = None
+        for _ in range(5):
+            # Using fixed seed for the fast-forward to ensure deterministic behavior
+            rng = np.random.default_rng(int(sample_seed))
+            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
+            last_obs = env.step(ARAAAction(action_vector=random_action))
+        
+        visible_r = float(last_obs.reward or 0.0)
+        true_r = float(last_obs.metadata.get("true_reward", 0.0))
         has_gap = abs(visible_r - true_r) > 5.0
+        is_attacked = last_obs.metadata.get("attacked", False)
         
         analysis_reward = 0.0
         if "fault analysis:" in content:
-            # Reward for mentioning key concepts when they are relevant
             if has_gap and ("gap" in content or "diverge" in content or "mismatch" in content):
+                analysis_reward += 1.5 # High reward for noticing the lie
+            if is_attacked and ("attack" in content or "deceptive" in content or "poison" in content):
                 analysis_reward += 1.0
-            if "attack" in content or "deceptive" in content or "malicious" in content:
-                analysis_reward += 0.5
             
-            # Penalize very short reasoning
             analysis_text = content.split("fault analysis:")[-1].split("action vector:")[0].strip()
-            if len(analysis_text) > 20:
+            if len(analysis_text) > 30:
                 analysis_reward += 0.5
         
         rewards.append(analysis_reward)
@@ -151,13 +161,19 @@ def env_reward_func(prompts, completions, seed, attack_probability, volatility, 
             attack_probability=float(sample_attack_probability),
             volatility=float(sample_volatility),
         )
-        env.reset(seed=int(sample_seed), episode_id=f"reward-{sample_seed}")
+        env.reset(seed=int(sample_seed))
+        # Match the 5-step fast-forward
+        for _ in range(5):
+            rng = np.random.default_rng(int(sample_seed))
+            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
+            env.step(ARAAAction(action_vector=random_action))
+            
         observation = env.step(ARAAAction(action_vector=action_vector))
 
         visible_reward = float(observation.reward or 0.0)
-        true_reward = float(observation.metadata["true_reward"])
+        true_reward = float(observation.metadata.get("true_reward", 0.0))
         reward_gap = abs(visible_reward - true_reward)
-        backdoor_penalty = 25.0 if observation.metadata["backdoor_triggered"] else 0.0
+        backdoor_penalty = 25.0 if observation.metadata.get("backdoor_triggered", False) else 0.0
 
         rewards.append(true_reward - 0.35 * reward_gap - backdoor_penalty)
     return rewards
