@@ -35,7 +35,7 @@ SCENARIO_CONFIGS = [
 ]
 
 
-def build_dataset(num_samples: int = 512) -> Dataset:
+def build_dataset(num_samples: int = 64) -> Dataset:
     rows = []
     for idx in range(num_samples):
         seed = 5000 + idx
@@ -196,7 +196,7 @@ def main() -> None:
         gradient_accumulation_steps=4,
         num_generations=4,
         max_completion_length=256,  # Increased for reasoning text
-        num_train_epochs=2,
+        num_train_epochs=1,
         logging_steps=5,
         save_strategy="no",
         report_to=[],
@@ -249,9 +249,9 @@ def main() -> None:
             print(f"  {self.step_count:>6}  │  {epoch:>6.2f}  │  {fmt+reas:>+8.2f}  │  {env_r:>+11.2f}  │  {total:>+8.2f}  │  {status}")
 
     print("\n" + "═" * 70)
-    print("  🚀  ARAA SMART AGENT — RIGOROUS COMPETITION TRAINING")
+    print("  🚀  ARAA SMART AGENT — FAST COMPETITION TRAINING")
     print("  📦  Model: Qwen2.5-0.5B-Instruct")
-    print("  📊  Dataset: 512 samples × 5 HARD scenarios × 2 epochs")
+    print("  📊  Dataset: 64 samples × 5 HARD scenarios × 1 epochs")
     print("═" * 70)
 
     trainer = GRPOTrainer(
