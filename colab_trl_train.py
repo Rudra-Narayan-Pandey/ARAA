@@ -23,7 +23,7 @@ from trl import GRPOConfig, GRPOTrainer
 from env import ARAAAction, ARAAEnv
 
 
-MODEL_NAME = "HuggingFaceTB/SmolLM2-135M-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 
 
 SCENARIO_CONFIGS = [
@@ -35,7 +35,7 @@ SCENARIO_CONFIGS = [
 ]
 
 
-def build_dataset(num_samples: int = 256) -> Dataset:
+def build_dataset(num_samples: int = 128) -> Dataset:
     rows = []
     for idx in range(num_samples):
         seed = 5000 + idx
@@ -121,8 +121,8 @@ def main() -> None:
         gradient_accumulation_steps=4,
         num_generations=4,
         max_completion_length=128,
-        num_train_epochs=3,
-        logging_steps=20, # Clean output
+        num_train_epochs=2,
+        logging_steps=10, # Clean output
         save_strategy="no",
         report_to=[],
         use_cpu=not torch.cuda.is_available(),
