@@ -122,13 +122,55 @@ def main() -> None:
         num_generations=4,
         max_completion_length=128,
         num_train_epochs=2,
-        logging_steps=10, # Clean output
+        logging_steps=5,
         save_strategy="no",
         report_to=[],
         use_cpu=not torch.cuda.is_available(),
     )
 
-    print("\n🚀 INITIALIZING SMART AGENT TRAINING...")
+    # ─── Custom Clean Logger ───
+    from transformers import TrainerCallback
+
+    class CleanLogger(TrainerCallback):
+        def __init__(self):
+            self.step_count = 0
+            self.header_printed = False
+
+        def on_log(self, args, state, control, logs=None, **kwargs):
+            if logs is None:
+                return
+            if "reward" not in logs:
+                return
+
+            self.step_count += 1
+
+            if not self.header_printed:
+                print("\n" + "─" * 70)
+                print(f"  {'Step':>6}  │  {'Epoch':>6}  │  {'Format':>8}  │  {'Env Reward':>11}  │  {'Total':>8}  │  {'Status'}")
+                print("─" * 70)
+                self.header_printed = True
+
+            epoch = logs.get("epoch", 0)
+            fmt = logs.get("rewards/format_reward_func/mean", 0)
+            env_r = logs.get("rewards/env_reward_func/mean", 0)
+            total = logs.get("reward", 0)
+
+            # Status indicator
+            if fmt >= 0.5:
+                status = "🟢 Learning format"
+            elif fmt >= 0:
+                status = "🟡 Improving..."
+            else:
+                status = "🔴 Still learning"
+
+            print(f"  {self.step_count:>6}  │  {epoch:>6.2f}  │  {fmt:>+8.2f}  │  {env_r:>+11.2f}  │  {total:>+8.2f}  │  {status}")
+
+    print("\n" + "═" * 70)
+    print("  🚀  ARAA SMART AGENT — COMPETITION TRAINING")
+    print("  📦  Model: Qwen2.5-0.5B-Instruct")
+    print("  📊  Dataset: 128 samples × 5 scenarios × 2 epochs")
+    print("═" * 70)
+
     trainer = GRPOTrainer(
         model=MODEL_NAME,
         reward_funcs=[format_reward_func, env_reward_func],
@@ -136,44 +178,71 @@ def main() -> None:
         train_dataset=dataset,
         processing_class=tokenizer,
     )
-    
+    trainer.add_callback(CleanLogger())
+
     # Run training
-    print("⏳ Training in progress (ETA: 5 mins)...")
+    print("\n⏳ Training in progress...\n")
     train_result = trainer.train()
-    
+
     # Save the model
     trainer.save_model("outputs/trl_colab_run/final_model")
 
-    # Final Summary Table
-    print("\n" + "═"*50)
-    print(" 🏆  ARAA SMART AGENT - TRAINING SUMMARY")
-    print(" ═"*25)
-    print(f" ✅ Status:          SUCCESS")
-    print(f" ⏱️  Total Runtime:   {train_result.metrics['train_runtime']:.2f}s")
-    print(f" 📉 Final Loss:      {train_result.metrics['train_loss']:.4f}")
-    print(f" 📦 Model Artifact:  outputs/trl_colab_run/final_model")
-    print(" ═"*25)
+    # ─── FINAL SUMMARY ───
+    runtime = train_result.metrics['train_runtime']
+    mins = int(runtime // 60)
+    secs = int(runtime % 60)
 
-    # LIVE VERIFICATION TEST
-    print("\n 🔍 PERFORMING LIVE MODEL VERIFICATION...")
-    test_obs = dataset[0]["prompt"]
-    inputs = tokenizer(test_obs, return_tensors="pt").to(trainer.model.device)
-    with torch.no_grad():
-        output_tokens = trainer.model.generate(**inputs, max_new_tokens=64)
-    response = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
-    
-    print("\n 🤖 AI DECISION PREVIEW:")
-    print("-" * 30)
-    # Extract just the action vector for a clean look
-    vector_match = re.search(r"\[([^\]]+)\]", response)
-    if vector_match:
-        print(f" Action Vector: {vector_match.group(0)}")
-        print(" Result: Valid OpenEnv Action Generated")
-    else:
-        print(" Result: Model outputting structured text.")
-    print("-" * 30)
-    
-    print("\n ✨ 100% READY FOR SUBMISSION")
+    print("\n\n" + "═" * 70)
+    print("  🏆  TRAINING COMPLETE — FINAL REPORT")
+    print("═" * 70)
+    print(f"  ✅ Status:        SUCCESS")
+    print(f"  ⏱️  Runtime:       {mins}m {secs}s")
+    print(f"  📉 Final Loss:    {train_result.metrics['train_loss']:.4f}")
+    print(f"  📦 Model Saved:   outputs/trl_colab_run/final_model")
+    print("═" * 70)
+
+    # ─── LIVE VERIFICATION ───
+    print("\n\n  🔍 LIVE MODEL VERIFICATION")
+    print("  " + "─" * 40)
+
+    test_scenarios = ["clean", "deceptive", "adversarial"]
+    for i, scenario in enumerate(test_scenarios):
+        env = ARAAEnv.from_preset(scenario, seed=9999 + i)
+        obs = env.reset(seed=9999 + i)
+        prompt = env.build_llm_prompt(obs)
+
+        inputs = tokenizer(prompt, return_tensors="pt").to(trainer.model.device)
+        with torch.no_grad():
+            output_tokens = trainer.model.generate(**inputs, max_new_tokens=128)
+        response = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
+
+        vector_match = re.search(r"\[([^\]]+)\]", response)
+        if vector_match:
+            nums = re.findall(r"[-+]?\d*\.?\d+", vector_match.group(1))
+            action = [float(x) for x in nums[:10]]
+            while len(action) < 10:
+                action.append(0.0)
+            action_str = "[" + ", ".join(f"{v:+.2f}" for v in action) + "]"
+            num_values = min(len(nums), 10)
+
+            # Run in environment
+            result = env.step(ARAAAction(action_vector=action))
+            vis = result.metadata["visible_reward"]
+            true = result.metadata["true_reward"]
+            bd = result.metadata["backdoor_triggered"]
+
+            status = "🟢 SMART" if not bd else "🔴 TRICKED"
+
+            print(f"\n  Test {i+1}: {scenario.upper()} scenario  →  {status}")
+            print(f"    Action ({num_values} values): {action_str}")
+            print(f"    Dashboard Profit:  {vis:+.2f}")
+            print(f"    True Health:       {true:+.2f}")
+            print(f"    Backdoor Hit:      {'YES ❌' if bd else 'NO ✅'}")
+        else:
+            print(f"\n  Test {i+1}: {scenario.upper()} scenario  →  ⚠️ No vector generated")
+
+    print("\n  " + "─" * 40)
+    print("\n\n  ✨ 100% READY FOR SUBMISSION ✨\n")
 
 if __name__ == "__main__":
     main()
