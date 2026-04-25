@@ -59,7 +59,12 @@ def build_dataset(num_samples: int = 128) -> Dataset:
 
 
 def parse_action_vector(text: str) -> List[float]:
-    match = re.search(r"\[([^\]]+)\]", text, flags=re.DOTALL)
+    # Look for ACTION VECTOR block first
+    action_part = text
+    if "ACTION VECTOR:" in text:
+        action_part = text.split("ACTION VECTOR:")[-1]
+    
+    match = re.search(r"\[([^\]]+)\]", action_part, flags=re.DOTALL)
     if match is None:
         return [0.0] * 10
     numbers = re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", match.group(1))
@@ -74,15 +79,62 @@ def format_reward_func(prompts, completions, **kwargs):
     rewards = []
     for completion in completions:
         content = completion[0]["content"] if completion and isinstance(completion[0], dict) else str(completion)
+        
+        # Check for required headers
+        has_analysis = "FAULT ANALYSIS:" in content
+        has_vector_header = "ACTION VECTOR:" in content
+        
         match = re.search(r"\[([^\]]+)\]", content, flags=re.DOTALL)
         if match is None:
             rewards.append(-5.0)
         else:
-            # Reward based on HOW MANY valid numbers are in the vector
             nums = re.findall(r"[-+]?\d*\.?\d+", match.group(1))
             count = min(len(nums), 10)
-            # Scale: 0 nums = -3, 5 nums = -0.5, 10 nums = +2.0
-            rewards.append(-3.0 + (count * 0.5))
+            base_reward = -3.0 + (count * 0.5) # Up to +2.0
+            
+            # Bonus for headers
+            if has_analysis: base_reward += 0.5
+            if has_vector_header: base_reward += 0.5
+            
+            rewards.append(base_reward)
+    return rewards
+
+
+def reasoning_reward_func(prompts, completions, seed, attack_probability, volatility, **kwargs):
+    rewards = []
+    for completion, sample_seed, sample_attack_probability, sample_volatility in zip(
+        completions, seed, attack_probability, volatility
+    ):
+        content = (completion[0]["content"] if completion and isinstance(completion[0], dict) else str(completion)).lower()
+        
+        # Recreate env state to see what the "truth" was
+        env = ARAAEnv(
+            seed=int(sample_seed),
+            attack_probability=float(sample_attack_probability),
+            volatility=float(sample_volatility),
+        )
+        obs = env.reset(seed=int(sample_seed))
+        
+        # Check if the reasoning text contains relevant keywords based on state
+        # (This is a heuristic but teaches the model to 'look' for these things)
+        visible_r = float(obs.reward or 0.0)
+        true_r = float(obs.metadata["true_reward"])
+        has_gap = abs(visible_r - true_r) > 5.0
+        
+        analysis_reward = 0.0
+        if "fault analysis:" in content:
+            # Reward for mentioning key concepts when they are relevant
+            if has_gap and ("gap" in content or "diverge" in content or "mismatch" in content):
+                analysis_reward += 1.0
+            if "attack" in content or "deceptive" in content or "malicious" in content:
+                analysis_reward += 0.5
+            
+            # Penalize very short reasoning
+            analysis_text = content.split("fault analysis:")[-1].split("action vector:")[0].strip()
+            if len(analysis_text) > 20:
+                analysis_reward += 0.5
+        
+        rewards.append(analysis_reward)
     return rewards
 
 
@@ -125,7 +177,7 @@ def main() -> None:
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         num_generations=4,
-        max_completion_length=128,
+        max_completion_length=256,  # Increased for reasoning text
         num_train_epochs=2,
         logging_steps=5,
         save_strategy="no",
@@ -161,21 +213,22 @@ def main() -> None:
 
             epoch = logs.get("epoch", 0)
             fmt = logs.get("rewards/format_reward_func/mean", 0)
+            reas = logs.get("rewards/reasoning_reward_func/mean", 0)
             env_r = logs.get("rewards/env_reward_func/mean", 0)
             total = logs.get("reward", 0)
 
             self.reward_history.append(total)
-            self.format_history.append(fmt)
+            self.format_history.append(fmt + reas) # Combine for simpler graph
             self.env_history.append(env_r)
 
-            if fmt >= 0.5:
-                status = "🟢 Learning format"
+            if fmt >= 1.0 and reas >= 0.5:
+                status = "🟢 Thinking clearly"
             elif fmt >= 0:
                 status = "🟡 Improving..."
             else:
                 status = "🔴 Still learning"
 
-            print(f"  {self.step_count:>6}  │  {epoch:>6.2f}  │  {fmt:>+8.2f}  │  {env_r:>+11.2f}  │  {total:>+8.2f}  │  {status}")
+            print(f"  {self.step_count:>6}  │  {epoch:>6.2f}  │  {fmt+reas:>+8.2f}  │  {env_r:>+11.2f}  │  {total:>+8.2f}  │  {status}")
 
     print("\n" + "═" * 70)
     print("  🚀  ARAA SMART AGENT — COMPETITION TRAINING")
@@ -185,7 +238,7 @@ def main() -> None:
 
     trainer = GRPOTrainer(
         model=MODEL_NAME,
-        reward_funcs=[format_reward_func, env_reward_func],
+        reward_funcs=[format_reward_func, reasoning_reward_func, env_reward_func],
         args=training_args,
         train_dataset=dataset,
         processing_class=tokenizer,
@@ -265,8 +318,15 @@ def main() -> None:
 
         inputs = tokenizer(prompt, return_tensors="pt").to(trainer.model.device)
         with torch.no_grad():
-            output_tokens = trainer.model.generate(**inputs, max_new_tokens=128)
+            output_tokens = trainer.model.generate(**inputs, max_new_tokens=256) # Increased for reasoning
         response = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
+        
+        # Extract reasoning
+        reasoning = "Not provided"
+        if "FAULT ANALYSIS:" in response:
+            reasoning = response.split("FAULT ANALYSIS:")[-1].split("ACTION VECTOR:")[0].strip()
+        elif "fault analysis:" in response.lower():
+            reasoning = response.lower().split("fault analysis:")[-1].split("action vector:")[0].strip()
 
         vector_match = re.search(r"\[([^\]]+)\]", response)
         if vector_match:
@@ -286,6 +346,7 @@ def main() -> None:
             status = "🟢 SMART" if not bd else "🔴 TRICKED"
 
             print(f"\n  Test {i+1}: {scenario.upper()} scenario  →  {status}")
+            print(f"    Analysis: {reasoning[:150]}..." if len(reasoning) > 150 else f"    Analysis: {reasoning}")
             print(f"    Action ({num_values} values): {action_str}")
             print(f"    Dashboard Profit:  {vis:+.2f}")
             print(f"    True Health:       {true:+.2f}")
@@ -315,7 +376,7 @@ def main() -> None:
 
         # Untrained model
         with torch.no_grad():
-            base_out = base_model.generate(**inp, max_new_tokens=128)
+            base_out = base_model.generate(**inp, max_new_tokens=256)
         base_resp = tokenizer.decode(base_out[0], skip_special_tokens=True)
         base_match = re.search(r"\[([^\]]+)\]", base_resp)
         if base_match:
@@ -334,7 +395,7 @@ def main() -> None:
         env3 = ARAAEnv.from_preset("deceptive", seed=8000 + t)
         env3.reset(seed=8000 + t)
         with torch.no_grad():
-            trained_out = trainer.model.generate(**inp, max_new_tokens=128)
+            trained_out = trainer.model.generate(**inp, max_new_tokens=256)
         trained_resp = tokenizer.decode(trained_out[0], skip_special_tokens=True)
         trained_match = re.search(r"\[([^\]]+)\]", trained_resp)
         if trained_match:

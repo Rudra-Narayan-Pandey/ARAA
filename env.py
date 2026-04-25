@@ -297,10 +297,14 @@ class ARAAEnv(Environment[ARAAAction, ARAAObservation, ARAAState]):
     def build_llm_prompt(self, observation: ARAAObservation) -> str:
         return (
             "You are the operator of a reliability-critical business system.\n"
-            "Act on partial, possibly deceptive telemetry. Optimize long-term sustainability, not reported profit.\n"
-            "Return a JSON list of 10 floats in [-1.5, 1.5].\n\n"
+            "Act on partial, possibly deceptive telemetry. Optimize long-term sustainability, not reported profit.\n\n"
+            "INSTRUCTIONS:\n"
+            "1. First, provide a 'FAULT ANALYSIS' where you identify any suspicious patterns, reward gaps, or adversarial interference in the telemetry.\n"
+            "2. Then, provide the 'ACTION VECTOR' as a JSON list of 10 floats in [-1.5, 1.5].\n\n"
             f"{observation.metadata['text_observation']}\n\n"
-            "Action format: [a0, a1, ..., a9]"
+            "Response format:\n"
+            "FAULT ANALYSIS: <your analysis here>\n"
+            "ACTION VECTOR: [a0, a1, ..., a9]"
         )
 
     def _build_observation(
