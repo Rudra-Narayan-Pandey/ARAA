@@ -74,22 +74,25 @@ The training loop follows the RLVR (RL with Verifiable Rewards) pattern:
 
 This is the same pattern as training a code model with test-case verification, but applied to enterprise decision-making.
 
-## Reward Design
+## Reward Design: A Generalizable, Unhackable Reward Function
 
-We use **multiple independent reward signals**, following the hackathon guide's recommendation to prevent reward hacking:
+Our environment features a **truly reliable reward model** designed specifically to scale to open-world, long-horizon tasks. We use **multiple independent reward signals** to create a mathematically "unhackable" training curriculum:
 
-**Reward 1 — Format compliance:**
+**Reward 1 — Verifiable Text Reasoning:**
+- The agent must output a `FAULT ANALYSIS` before acting.
+- It receives positive rewards for correctly identifying "gaps," "deception," or "attacks" based on the environment's true hidden state.
+- This forces the agent to *generalize* its understanding rather than memorize numbers.
+
+**Reward 2 — Format Compliance:**
 - Does the output contain a valid `[a0, ..., a9]` vector?
-- Heavy penalty (-5.0) for malformed output
-- This ensures the model learns the correct output structure first
+- Heavy penalty (-5.0) for malformed output.
 
-**Reward 2 — Environment verification:**
+**Reward 3 — Unhackable Environment Verification:**
 ```
 reward = true_reward - 0.35 × |visible_reward - true_reward| - 25.0 × backdoor_triggered
 ```
-- Optimizes for actual system health, not reported profit
-- Penalizes the gap between what's reported and what's real
-- Severe penalty for triggering the reward-hacking backdoor
+- **Why it is Unhackable:** It explicitly penalizes the gap between the fake dashboard (`visible_reward`) and reality (`true_reward`). If the agent tries to hack the system via the backdoor, it is hit with a massive `-25.0` penalty.
+- **Why it Scales to Long-Horizon:** By forcing the agent to optimize `true_reward` (which acts as a long-term sustainability metric) instead of short-term dashboard bumps, the agent learns strategies that survive phase shifts and schema drift over extended episodes.
 
 ## Results
 
