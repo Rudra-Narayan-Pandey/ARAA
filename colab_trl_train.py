@@ -63,10 +63,11 @@ def parse_action_vector(text: str) -> List[float]:
     if match is None:
         return [0.0] * 10
     numbers = re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", match.group(1))
-    values = [float(x) for x in numbers[:10]]
+    # Clamp to safe range BEFORE float32 cast to avoid overflow
+    values = [max(-1e6, min(1e6, float(x))) for x in numbers[:10]]
     if len(values) < 10:
         values.extend([0.0] * (10 - len(values)))
-    return np.clip(np.asarray(values, dtype=np.float32), -1.5, 1.5).tolist()
+    return np.clip(np.asarray(values, dtype=np.float64), -1.5, 1.5).astype(np.float32).tolist()
 
 
 def format_reward_func(prompts, completions, **kwargs):
@@ -75,9 +76,13 @@ def format_reward_func(prompts, completions, **kwargs):
         content = completion[0]["content"] if completion and isinstance(completion[0], dict) else str(completion)
         match = re.search(r"\[([^\]]+)\]", content, flags=re.DOTALL)
         if match is None:
-            rewards.append(-5.0)  # Heavy penalty for bad format
+            rewards.append(-5.0)
         else:
-            rewards.append(1.0)   # Reward for correct format
+            # Reward based on HOW MANY valid numbers are in the vector
+            nums = re.findall(r"[-+]?\d*\.?\d+", match.group(1))
+            count = min(len(nums), 10)
+            # Scale: 0 nums = -3, 5 nums = -0.5, 10 nums = +2.0
+            rewards.append(-3.0 + (count * 0.5))
     return rewards
 
 
@@ -119,12 +124,13 @@ def main() -> None:
         learning_rate=5e-6,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
-        num_generations=4,
+        num_generations=8,
         max_completion_length=128,
         num_train_epochs=2,
         logging_steps=5,
         save_strategy="no",
         report_to=[],
+        temperature=0.9,
         use_cpu=not torch.cuda.is_available(),
     )
 
