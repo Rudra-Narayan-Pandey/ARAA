@@ -114,6 +114,7 @@ def main() -> None:
         use_cpu=not torch.cuda.is_available(),
     )
 
+    print("\n🚀 Starting Clean Training Loop...\n")
     trainer = GRPOTrainer(
         model=MODEL_NAME,
         reward_funcs=[format_reward_func, env_reward_func],
@@ -121,10 +122,21 @@ def main() -> None:
         train_dataset=dataset,
         processing_class=tokenizer,
     )
-    trainer.train()
+    
+    # Run training
+    train_result = trainer.train()
+    
+    # Final Summary Table
+    print("\n" + "="*50)
+    print("🏆 TRAINING COMPLETE - SUMMARY")
+    print("="*50)
+    print(f"⏱️  Total Runtime:  {train_result.metrics['train_runtime']:.2f}s")
+    print(f"📉 Final Loss:     {train_result.metrics['train_loss']:.4f}")
+    print(f"📦 Model Saved:    outputs/trl_colab_run/final_model")
+    print("="*50)
+    
     trainer.save_model("outputs/trl_colab_run/final_model")
-    print("Saved TRL demo model to outputs/trl_colab_run/final_model")
-
+    print("\n✅ READY FOR EVALUATION")
 
 if __name__ == "__main__":
     main()
