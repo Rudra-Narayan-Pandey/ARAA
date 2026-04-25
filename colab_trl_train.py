@@ -124,7 +124,7 @@ def main() -> None:
         learning_rate=5e-6,
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
-        num_generations=8,
+        num_generations=4,
         max_completion_length=128,
         num_train_epochs=2,
         logging_steps=5,
