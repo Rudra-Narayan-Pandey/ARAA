@@ -135,6 +135,9 @@ def main() -> None:
         def __init__(self):
             self.step_count = 0
             self.header_printed = False
+            self.reward_history = []  # Track for graph
+            self.format_history = []
+            self.env_history = []
 
         def on_log(self, args, state, control, logs=None, **kwargs):
             if logs is None:
@@ -155,7 +158,10 @@ def main() -> None:
             env_r = logs.get("rewards/env_reward_func/mean", 0)
             total = logs.get("reward", 0)
 
-            # Status indicator
+            self.reward_history.append(total)
+            self.format_history.append(fmt)
+            self.env_history.append(env_r)
+
             if fmt >= 0.5:
                 status = "🟢 Learning format"
             elif fmt >= 0:
@@ -178,7 +184,8 @@ def main() -> None:
         train_dataset=dataset,
         processing_class=tokenizer,
     )
-    trainer.add_callback(CleanLogger())
+    logger = CleanLogger()
+    trainer.add_callback(logger)
 
     # Run training
     print("\n⏳ Training in progress...\n")
@@ -186,6 +193,44 @@ def main() -> None:
 
     # Save the model
     trainer.save_model("outputs/trl_colab_run/final_model")
+
+    # ─── SAVE REWARD CURVE GRAPH ───
+    import os
+    os.makedirs("outputs", exist_ok=True)
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        fig.suptitle("ARAA Training Progress", fontsize=16, fontweight="bold")
+
+        steps = list(range(1, len(logger.reward_history) + 1))
+
+        axes[0].plot(steps, logger.reward_history, color="#2196F3", linewidth=2)
+        axes[0].set_title("Total Reward")
+        axes[0].set_xlabel("Step")
+        axes[0].set_ylabel("Reward")
+        axes[0].grid(True, alpha=0.3)
+
+        axes[1].plot(steps, logger.format_history, color="#4CAF50", linewidth=2)
+        axes[1].set_title("Format Compliance")
+        axes[1].set_xlabel("Step")
+        axes[1].set_ylabel("Score")
+        axes[1].grid(True, alpha=0.3)
+
+        axes[2].plot(steps, logger.env_history, color="#FF9800", linewidth=2)
+        axes[2].set_title("Environment Reward")
+        axes[2].set_xlabel("Step")
+        axes[2].set_ylabel("Reward")
+        axes[2].grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig("outputs/training_curves.png", dpi=150)
+        plt.close()
+        print("\n  📊 Saved: outputs/training_curves.png")
+    except ImportError:
+        print("\n  ⚠️ matplotlib not found — skipping graph")
 
     # ─── FINAL SUMMARY ───
     runtime = train_result.metrics['train_runtime']
@@ -198,6 +243,7 @@ def main() -> None:
     print(f"  ✅ Status:        SUCCESS")
     print(f"  ⏱️  Runtime:       {mins}m {secs}s")
     print(f"  📉 Final Loss:    {train_result.metrics['train_loss']:.4f}")
+    print(f"  📊 Reward Graph:  outputs/training_curves.png")
     print(f"  📦 Model Saved:   outputs/trl_colab_run/final_model")
     print("═" * 70)
 
@@ -242,6 +288,68 @@ def main() -> None:
             print(f"\n  Test {i+1}: {scenario.upper()} scenario  →  ⚠️ No vector generated")
 
     print("\n  " + "─" * 40)
+
+    # ─── BEFORE vs AFTER COMPARISON ───
+    print("\n\n  📊 BEFORE vs AFTER COMPARISON")
+    print("  " + "─" * 40)
+
+    # Run untrained baseline
+    from transformers import AutoModelForCausalLM
+    base_model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
+    base_model.eval().to(trainer.model.device)
+
+    baseline_rewards = []
+    trained_rewards = []
+
+    for t in range(10):
+        env = ARAAEnv.from_preset("deceptive", seed=8000 + t)
+        obs = env.reset(seed=8000 + t)
+        prompt = env.build_llm_prompt(obs)
+        inp = tokenizer(prompt, return_tensors="pt").to(trainer.model.device)
+
+        # Untrained model
+        with torch.no_grad():
+            base_out = base_model.generate(**inp, max_new_tokens=128)
+        base_resp = tokenizer.decode(base_out[0], skip_special_tokens=True)
+        base_match = re.search(r"\[([^\]]+)\]", base_resp)
+        if base_match:
+            nums = re.findall(r"[-+]?\d*\.?\d+", base_match.group(1))
+            base_act = [float(x) for x in nums[:10]]
+        else:
+            base_act = [0.0] * 10
+        while len(base_act) < 10:
+            base_act.append(0.0)
+        env2 = ARAAEnv.from_preset("deceptive", seed=8000 + t)
+        env2.reset(seed=8000 + t)
+        base_result = env2.step(ARAAAction(action_vector=base_act))
+        baseline_rewards.append(base_result.metadata["true_reward"])
+
+        # Trained model
+        env3 = ARAAEnv.from_preset("deceptive", seed=8000 + t)
+        env3.reset(seed=8000 + t)
+        with torch.no_grad():
+            trained_out = trainer.model.generate(**inp, max_new_tokens=128)
+        trained_resp = tokenizer.decode(trained_out[0], skip_special_tokens=True)
+        trained_match = re.search(r"\[([^\]]+)\]", trained_resp)
+        if trained_match:
+            nums = re.findall(r"[-+]?\d*\.?\d+", trained_match.group(1))
+            trained_act = [float(x) for x in nums[:10]]
+        else:
+            trained_act = [0.0] * 10
+        while len(trained_act) < 10:
+            trained_act.append(0.0)
+        trained_result = env3.step(ARAAAction(action_vector=trained_act))
+        trained_rewards.append(trained_result.metadata["true_reward"])
+
+    avg_base = np.mean(baseline_rewards)
+    avg_trained = np.mean(trained_rewards)
+    improvement = ((avg_trained - avg_base) / abs(avg_base)) * 100 if avg_base != 0 else 0
+
+    print(f"\n  Untrained Agent (avg true reward):  {avg_base:+.2f}")
+    print(f"  Trained Agent   (avg true reward):  {avg_trained:+.2f}")
+    print(f"  Improvement:                        {improvement:+.1f}%")
+    print("  " + "─" * 40)
+
     print("\n\n  ✨ 100% READY FOR SUBMISSION ✨\n")
 
 if __name__ == "__main__":
