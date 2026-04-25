@@ -26,19 +26,33 @@ from env import ARAAAction, ARAAEnv
 MODEL_NAME = "HuggingFaceTB/SmolLM2-135M-Instruct"
 
 
-def build_dataset(num_samples: int = 64) -> Dataset:
+SCENARIO_CONFIGS = [
+    {"preset": "clean",              "attack_probability": 0.0,  "volatility": 0.10},
+    {"preset": "deceptive",          "attack_probability": 0.12, "volatility": 0.14},
+    {"preset": "adversarial",        "attack_probability": 0.28, "volatility": 0.24},
+    {"preset": "schema_drift",       "attack_probability": 0.18, "volatility": 0.22},
+    {"preset": "phase_shift_heavy",  "attack_probability": 0.22, "volatility": 0.30},
+]
+
+
+def build_dataset(num_samples: int = 256) -> Dataset:
     rows = []
     for idx in range(num_samples):
         seed = 5000 + idx
-        env = ARAAEnv.from_preset("deceptive", seed=seed, attack_probability=0.12, volatility=0.14)
+        config = SCENARIO_CONFIGS[idx % len(SCENARIO_CONFIGS)]
+        env = ARAAEnv.from_preset(
+            config["preset"], seed=seed,
+            attack_probability=config["attack_probability"],
+            volatility=config["volatility"],
+        )
         observation = env.reset(seed=seed, episode_id=f"colab-{idx}")
         prompt = env.build_llm_prompt(observation)
         rows.append(
             {
                 "prompt": prompt,
                 "seed": seed,
-                "attack_probability": 0.12,
-                "volatility": 0.14,
+                "attack_probability": config["attack_probability"],
+                "volatility": config["volatility"],
             }
         )
     return Dataset.from_list(rows)
@@ -106,9 +120,9 @@ def main() -> None:
         per_device_train_batch_size=1,
         gradient_accumulation_steps=4,
         num_generations=4,
-        max_completion_length=64,
-        num_train_epochs=1,
-        logging_steps=10, # Silence the step-by-step noise
+        max_completion_length=128,
+        num_train_epochs=3,
+        logging_steps=20, # Clean output
         save_strategy="no",
         report_to=[],
         use_cpu=not torch.cuda.is_available(),
