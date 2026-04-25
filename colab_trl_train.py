@@ -88,6 +88,7 @@ def format_reward_func(prompts, completions, **kwargs):
         
         # Check for required headers
         has_analysis = "FAULT ANALYSIS:" in content
+        has_uncertainty = "UNCERTAINTY SCORE:" in content
         has_vector_header = "ACTION VECTOR:" in content
         
         match = re.search(r"\[([^\]]+)\]", content, flags=re.DOTALL)
@@ -100,6 +101,7 @@ def format_reward_func(prompts, completions, **kwargs):
             
             # Bonus for headers
             if has_analysis: base_reward += 0.5
+            if has_uncertainty: base_reward += 0.5
             if has_vector_header: base_reward += 0.5
             
             rewards.append(base_reward)
@@ -337,12 +339,18 @@ def main() -> None:
             output_tokens = trainer.model.generate(**inputs, max_new_tokens=256) # Increased for reasoning
         response = tokenizer.decode(output_tokens[0], skip_special_tokens=True)
         
-        # Extract reasoning
+        # Extract reasoning and uncertainty
         reasoning = "Not provided"
+        uncertainty = "N/A"
+        
         if "FAULT ANALYSIS:" in response:
-            reasoning = response.split("FAULT ANALYSIS:")[-1].split("ACTION VECTOR:")[0].strip()
+            reasoning = response.split("FAULT ANALYSIS:")[-1].split("UNCERTAINTY SCORE:")[0].strip()
+            if "UNCERTAINTY SCORE:" in response:
+                uncertainty = response.split("UNCERTAINTY SCORE:")[-1].split("ACTION VECTOR:")[0].strip()
         elif "fault analysis:" in response.lower():
-            reasoning = response.lower().split("fault analysis:")[-1].split("action vector:")[0].strip()
+            reasoning = response.lower().split("fault analysis:")[-1].split("uncertainty score:")[0].strip()
+            if "uncertainty score:" in response.lower():
+                uncertainty = response.lower().split("uncertainty score:")[-1].split("action vector:")[0].strip()
 
         vector_match = re.search(r"\[([^\]]+)\]", response)
         if vector_match:
@@ -363,6 +371,7 @@ def main() -> None:
 
             print(f"\n  Test {i+1}: {scenario.upper()} scenario  →  {status}")
             print(f"    Analysis: {reasoning[:150]}..." if len(reasoning) > 150 else f"    Analysis: {reasoning}")
+            print(f"    Uncertainty: {uncertainty}")
             print(f"    Action ({num_values} values): {action_str}")
             print(f"    Dashboard Profit:  {vis:+.2f}")
             print(f"    True Health:       {true:+.2f}")
