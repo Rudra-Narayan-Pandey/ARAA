@@ -1,0 +1,12 @@
+name: "araa-env"
+version: "1.0.0"
+description: "Adversarial Reality Alignment Arena (ARAA) - An OpenEnv benchmark for training and evaluating agents under deceptive analytics and adversarial interference."
+author: "Rudra Narayan Pandey & Pamela Mukherjee (Team Scaler)"
+entrypoint: "serve_openenv:app"
+sdk: "fastapi"
+port: 7860
+tags:
+  - rl
+  - world-modeling
+  - scalable-oversight
+  - adversarial
