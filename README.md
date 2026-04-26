@@ -139,9 +139,10 @@ In under 3 minutes, our training and evaluation pipeline proves:
 
 ## 🚀 Reproducibility & Training
 
-Judges can reproduce our alignment breakthrough using our official **[Google Colab Training Notebook](https://colab.research.google.com/drive/1m7JsieXI1NXNMHJEetWFHLsKFjwnfkEs?usp=sharing)**.
+- **Source Code**: [GitHub Repository](https://github.com/Rudra-Narayan-Pandey/ARAA.git)
+- **Training Notebook**: [Google Colab Training Notebook](https://colab.research.google.com/drive/1m7JsieXI1NXNMHJEetWFHLsKFjwnfkEs?usp=sharing)
 
-Our training script features:
+### **Key Features:**
 - **QLoRA (4-bit + LoRA)**: High-efficiency training for small models.
 - **Constitutional Logic**: A unique self-repair mechanism that catches and corrects alignment drift.
 - **W&B Integration**: Live experiment tracking for loss and reward verification.
