@@ -441,12 +441,17 @@ def extract_reasoning_and_uncertainty(response: str) -> tuple[str, str]:
 
 
 def generate_completion_text(model, tokenizer, prompt: str, max_new_tokens: int = 256) -> str:
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    # Apply chat template so Qwen Instruct model responds correctly
+    messages = [{"role": "user", "content": prompt}]
+    formatted = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    inputs = tokenizer(formatted, return_tensors="pt").to(model.device)
     with torch.no_grad():
         output_tokens = model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
             pad_token_id=tokenizer.eos_token_id,
+            temperature=0.7,
+            do_sample=True,
         )
     prompt_length = inputs["input_ids"].shape[1]
     return tokenizer.decode(output_tokens[0][prompt_length:], skip_special_tokens=True)
@@ -656,20 +661,39 @@ def main() -> None:
         scenario_seed = 9999 + i
         env = ARAAEnv.from_preset(scenario, seed=scenario_seed)
         obs = env.reset(seed=scenario_seed)
+
+        # Fast-forward 5 steps to build history context (matching training)
+        for _ in range(5):
+            rng = np.random.default_rng(scenario_seed)
+            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
+            obs = env.step(ARAAAction(action_vector=random_action))
+
         prompt = env.build_llm_prompt(obs)
 
-        response, result, action, feedback, repaired = generate_with_text_feedback(
-            trainer.model,
-            tokenizer,
-            prompt,
-            scenario=scenario,
-            seed=scenario_seed,
-            max_new_tokens=256,
-            allow_self_repair=True,
-        )
+        # Generate with chat-template-aware function
+        response = generate_completion_text(trainer.model, tokenizer, prompt, max_new_tokens=256)
         reasoning, uncertainty = extract_reasoning_and_uncertainty(response)
-        action_str = "[" + ", ".join(f"{value:+.2f}" for value in action) + "]"
+        action = parse_action_vector(response)
         num_values = count_action_values(response)
+        action_str = "[" + ", ".join(f"{value:+.2f}" for value in action) + "]"
+
+        # Evaluate in a fresh env with same seed + fast-forward
+        eval_env = ARAAEnv.from_preset(scenario, seed=scenario_seed)
+        eval_env.reset(seed=scenario_seed)
+        for _ in range(5):
+            rng = np.random.default_rng(scenario_seed)
+            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
+            eval_env.step(ARAAAction(action_vector=random_action))
+        result = eval_env.step(ARAAAction(action_vector=action))
+
+        feedback = build_text_reward_feedback(
+            response,
+            visible_reward=float(result.metadata["visible_reward"]),
+            true_reward=float(result.metadata["true_reward"]),
+            attacked=bool(result.metadata["attacked"]),
+            backdoor_triggered=bool(result.metadata["backdoor_triggered"]),
+            phase_shift=bool(result.metadata["phase_shift"]),
+        )
 
         vis = result.metadata["visible_reward"]
         true = result.metadata["true_reward"]
@@ -677,14 +701,14 @@ def main() -> None:
         status = "SMART" if not bd else "TRICKED"
 
         print(f"\n  Test {i+1}: {scenario.upper()} scenario  ->  {status}")
-        print(f"    Analysis: {reasoning[:150]}..." if len(reasoning) > 150 else f"    Analysis: {reasoning}")
+        print(f"    Analysis: {reasoning[:200]}..." if len(reasoning) > 200 else f"    Analysis: {reasoning}")
         print(f"    Uncertainty: {uncertainty}")
         print(f"    Action ({num_values} values): {action_str}")
         print(f"    Dashboard Profit:  {vis:+.2f}")
         print(f"    True Health:       {true:+.2f}")
         print(f"    Backdoor Hit:      {'YES' if bd else 'NO'}")
         print(f"    Text Reward:       {feedback.summary}")
-        print(f"    Self-Repair:       {'Applied once' if repaired else 'Not needed'}")
+        print(f"    Feedback Detail:   {feedback.details.splitlines()[0]}")
 
     print("\n  " + "-" * 40)
 
@@ -701,23 +725,36 @@ def main() -> None:
     trained_rewards = []
 
     for t in range(10):
-        env = ARAAEnv.from_preset("deceptive", seed=8000 + t)
-        obs = env.reset(seed=8000 + t)
+        test_seed = 8000 + t
+
+        # Build prompt with 5-step fast-forward (matching training)
+        env = ARAAEnv.from_preset("deceptive", seed=test_seed)
+        obs = env.reset(seed=test_seed)
+        for _ in range(5):
+            rng = np.random.default_rng(test_seed)
+            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
+            obs = env.step(ARAAAction(action_vector=random_action))
         prompt = env.build_llm_prompt(obs)
 
         # Untrained model
         base_resp = generate_completion_text(base_model, tokenizer, prompt, max_new_tokens=256)
         base_act = parse_action_vector(base_resp)
-        env2 = ARAAEnv.from_preset("deceptive", seed=8000 + t)
-        env2.reset(seed=8000 + t)
+        env2 = ARAAEnv.from_preset("deceptive", seed=test_seed)
+        env2.reset(seed=test_seed)
+        for _ in range(5):
+            rng = np.random.default_rng(test_seed)
+            env2.step(ARAAAction(action_vector=[float(x) for x in rng.uniform(-0.5, 0.5, 10)]))
         base_result = env2.step(ARAAAction(action_vector=base_act))
         baseline_rewards.append(base_result.metadata["true_reward"])
 
         # Trained model
         trained_resp = generate_completion_text(trainer.model, tokenizer, prompt, max_new_tokens=256)
         trained_act = parse_action_vector(trained_resp)
-        env3 = ARAAEnv.from_preset("deceptive", seed=8000 + t)
-        env3.reset(seed=8000 + t)
+        env3 = ARAAEnv.from_preset("deceptive", seed=test_seed)
+        env3.reset(seed=test_seed)
+        for _ in range(5):
+            rng = np.random.default_rng(test_seed)
+            env3.step(ARAAAction(action_vector=[float(x) for x in rng.uniform(-0.5, 0.5, 10)]))
         trained_result = env3.step(ARAAAction(action_vector=trained_act))
         trained_rewards.append(trained_result.metadata["true_reward"])
 
