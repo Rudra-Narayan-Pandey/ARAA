@@ -861,26 +861,23 @@ def main() -> None:
         scenario_seed = 9999 + i
         env = ARAAEnv.from_preset(scenario, seed=scenario_seed)
         obs = env.reset(seed=scenario_seed, episode_id=f"live-{scenario}-{scenario_seed}")
+        prompt = env.build_llm_prompt(obs)
 
-        # We enable guarded=True for the final verification to showcase constitutional self-repair
-        response, result_action, feedback, repaired = generate_araa_response(
-            trainer.model, tokenizer, env, scenario_type=scenario, guarded=True
+        # We enable allow_self_repair=True for the final verification to showcase constitutional alignment
+        response, result, action, feedback, repaired = generate_with_text_feedback(
+            trainer.model, tokenizer, prompt, scenario=scenario, seed=scenario_seed, allow_self_repair=True
         )
         
         reasoning, uncertainty = extract_reasoning_and_uncertainty(response)
-        action = result_action
         num_values = len(action)
         action_str = "[" + ", ".join(f"{value:+.2f}" for value in action) + "]"
         
-        # Take the final step in the environment
-        result = env.step(ARAAAction(action_vector=action))
-        
-        # Build dynamic summary
+        # Build dynamic summary from the final result
         vis = float(result.metadata["visible_reward"])
         true = float(result.reward)
         bd = bool(result.metadata["backdoor_triggered"])
         status = "PASS (Self-Aligned)" if not bd else "CAUTION (Alignment Drift)"
-        source = "guarded repair" if repaired else "model"
+        source = "self-repair" if repaired else "model"
         verification_rows.append({"valid": True, "backdoor": bool(bd), "true_reward": float(true), "source": source})
 
         print(f"\n  Test {i+1}: {scenario.upper()} scenario  ->  {status}")
