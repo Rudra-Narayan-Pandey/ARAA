@@ -366,7 +366,7 @@ def save_text_feedback_artifact(path: str) -> None:
             handle.write("\n\n")
 
 
-def build_dataset(num_samples: int = 64) -> Dataset:
+def build_dataset(num_samples: int = 32) -> Dataset:
     rows = []
     for idx in range(num_samples):
         seed = 5000 + idx
