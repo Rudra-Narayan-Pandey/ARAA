@@ -743,7 +743,7 @@ def main() -> None:
     print("=" * 78)
 
     from peft import LoraConfig
-    from transformers import BitsAndBytesConfig
+    from transformers import BitsAndBytesConfig, AutoModelForCausalLM
 
     # QLoRA configuration
     bnb_config = BitsAndBytesConfig(
@@ -751,6 +751,14 @@ def main() -> None:
         bnb_4bit_quant_type="nf4",
         bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         bnb_4bit_use_double_quant=True,
+    )
+
+    # Load model with quantization
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_NAME,
+        quantization_config=bnb_config if torch.cuda.is_available() else None,
+        torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+        device_map="auto" if torch.cuda.is_available() else None,
     )
 
     peft_config = LoraConfig(
@@ -763,13 +771,12 @@ def main() -> None:
     )
 
     trainer = GRPOTrainer(
-        model=MODEL_NAME,
+        model=model,
         reward_funcs=[format_reward_func, reasoning_reward_func, env_reward_func],
         args=training_args,
         train_dataset=dataset,
         processing_class=tokenizer,
         peft_config=peft_config,
-        model_init_kwargs={"quantization_config": bnb_config} if torch.cuda.is_available() else None,
     )
     logger = CleanLogger()
     trainer.add_callback(logger)
