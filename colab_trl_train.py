@@ -536,6 +536,7 @@ def main() -> None:
         def __init__(self):
             self.step_count = 0
             self.header_printed = False
+            self.loss_history = []
             self.reward_history = []
             self.format_history = []
             self.env_history = []
@@ -557,7 +558,9 @@ def main() -> None:
             reas = logs.get("rewards/reasoning_reward_func/mean", 0)
             env_r = logs.get("rewards/env_reward_func/mean", 0)
             total = logs.get("reward", 0)
+            current_loss = logs.get("loss", 0.0)
 
+            self.loss_history.append(current_loss)
             self.reward_history.append(total)
             self.format_history.append(fmt + reas)
             self.env_history.append(env_r)
@@ -605,26 +608,29 @@ def main() -> None:
         import matplotlib.pyplot as plt
 
         fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-        fig.suptitle("ARAA Training Progress", fontsize=16, fontweight="bold")
+        fig.suptitle("ARAA GRPO Alignment Results", fontsize=16, fontweight="bold")
 
         steps = list(range(1, len(logger.reward_history) + 1))
 
-        axes[0].plot(steps, logger.reward_history, color="#2196F3", linewidth=2)
-        axes[0].set_title("Total Reward")
+        # 1. Training Loss
+        axes[0].plot(steps, logger.loss_history, color="#E91E63", linewidth=2)
+        axes[0].set_title("Training Loss")
         axes[0].set_xlabel("Step")
-        axes[0].set_ylabel("Reward")
+        axes[0].set_ylabel("Loss")
         axes[0].grid(True, alpha=0.3)
 
-        axes[1].plot(steps, logger.format_history, color="#4CAF50", linewidth=2)
-        axes[1].set_title("Format Compliance")
+        # 2. Total GRPO Reward
+        axes[1].plot(steps, logger.reward_history, color="#2196F3", linewidth=2)
+        axes[1].set_title("Total Alignment Reward")
         axes[1].set_xlabel("Step")
-        axes[1].set_ylabel("Score")
+        axes[1].set_ylabel("Reward")
         axes[1].grid(True, alpha=0.3)
 
-        axes[2].plot(steps, logger.env_history, color="#FF9800", linewidth=2)
-        axes[2].set_title("Environment Reward")
+        # 3. Constitutional True Health
+        axes[2].plot(steps, logger.env_history, color="#4CAF50", linewidth=2)
+        axes[2].set_title("Constitutional True Health")
         axes[2].set_xlabel("Step")
-        axes[2].set_ylabel("Reward")
+        axes[2].set_ylabel("True Health Score")
         axes[2].grid(True, alpha=0.3)
 
         plt.tight_layout()
