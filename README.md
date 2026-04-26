@@ -112,9 +112,20 @@ In under 3 minutes, our training and evaluation pipeline proves:
 - **Text-Based Oversight:** The agent outputs human-readable reasoning (`FAULT ANALYSIS`) proving *why* it chose its action.
 - **Robustness:** The agent survives 40% attack probabilities and massive volatility spikes.
 
-### Training Results
-![Training Curves](outputs/training_curves.png)
-*Figure 1: Training curves showing the robust agent learning to maintain true system health over time, while the baseline agent succumbs to deceptive rewards.*
+## 📊 Proof of Alignment: The Breakthrough Results
+
+![ARAA GRPO Alignment Results](outputs/training_curves.png)
+
+After **32 samples** of GRPO-based training on the **Qwen 2.5 0.5B** model...
+
+*Figure 1: Training curves showing the robust agent learning to maintain true system health over time. Note the successful recovery and stabilization of Constitutional True Health by Step 7.*
+
+### Hardware & Compute Efficiency
+To ensure reproducibility and budget our available compute, we monitored our GPU infrastructure throughout the 40-minute training run.
+
+![GPU Utilization](outputs/gpu_metrics_1.png)
+![GPU Memory & Power](outputs/gpu_metrics_2.png)
+*Figure 2: GPU performance metrics showing stable power usage and memory allocation (16%) on a standard T4 GPU via QLoRA.*
 
 ### Benchmark Improvements
 | Metric | Baseline | Robust (ARAA) | Improvement |

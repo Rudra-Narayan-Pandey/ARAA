@@ -81,6 +81,8 @@ By shaping the reward to give clear positive signals (`+25` safe bonuses) for st
 
 ## 📊 Proof of Alignment: The Breakthrough Results
 
+![ARAA GRPO Alignment Results](outputs/training_curves.png)
+
 After **32 samples** of GRPO-based training on the **Qwen 2.5 0.5B** model, the results were definitive. By enabling **Constitutional Self-Repair**, the model achieved a 100% success rate across all adversarial test scenarios.
 
 ### 🏆 Final Live Verification Results (Colab Run)
