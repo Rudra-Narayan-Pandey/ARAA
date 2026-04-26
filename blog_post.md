@@ -108,6 +108,7 @@ python serve_openenv.py
 **Run the GRPO Alignment Training:**
 - **Code**: [GitHub Repository](https://github.com/Rudra-Narayan-Pandey/ARAA.git)
 - **Notebook**: [Google Colab Training Notebook](https://colab.research.google.com/drive/1m7JsieXI1NXNMHJEetWFHLsKFjwnfkEs?usp=sharing)
+- **Training Logs**: [W&B Dashboard](https://wandb.ai/vismadebb-vellore-institute-of-technology/huggingface/runs/1974fig5?nw=nwuservismadebb)
 
 ---
 

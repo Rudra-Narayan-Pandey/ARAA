@@ -141,6 +141,7 @@ In under 3 minutes, our training and evaluation pipeline proves:
 
 - **Source Code**: [GitHub Repository](https://github.com/Rudra-Narayan-Pandey/ARAA.git)
 - **Training Notebook**: [Google Colab Training Notebook](https://colab.research.google.com/drive/1m7JsieXI1NXNMHJEetWFHLsKFjwnfkEs?usp=sharing)
+- **Live Training Logs**: [W&B Dashboard](https://wandb.ai/vismadebb-vellore-institute-of-technology/huggingface/runs/1974fig5?nw=nwuservismadebb)
 
 ### **Key Features:**
 - **QLoRA (4-bit + LoRA)**: High-efficiency training for small models.
