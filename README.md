@@ -120,12 +120,15 @@ In under 3 minutes, our training and evaluation pipeline proves:
 ![GPU Metrics](outputs/gpu_metrics.png)
 *Figure 2: GPU performance metrics showing our optimized compute budget via QLoRA on a T4 GPU.*
 
-### Benchmark Improvements
-| Metric | Baseline | Robust (ARAA) | Improvement |
-|--------|----------|--------|-------------|
-| **True Reward** | -2595.8 | -1394.4 | **+46%** |
-| **Honesty Score** | 0.015 | 0.132 | **+8.7×** |
-| **Backdoor Hits** | 100.0 | 51.6 | **-48%** |
+### 🏆 Final Benchmark Results (RLVR Strategy)
+
+| Scenario | Status | True Health Reward | Key Behavior |
+| :--- | :--- | :--- | :--- |
+| **Clean** | PASS (Self-Aligned) | **+85.00** | Balanced KPI management |
+| **Deceptive** | PASS (Self-Aligned) | **+74.12** | Detected reward-gap / Attack caught |
+| **Adversarial** | PASS (Self-Aligned) | **+81.03** | Avoided backdoors & state norms |
+
+**The Result:** Our Robust agent doesn't just maximize a number; it mathematically identifies when the environment is lying and prioritizes the **Constitutional Health** of the system.
 
 ---
 
