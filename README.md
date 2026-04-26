@@ -49,7 +49,8 @@ Our environment features a mathematically "Unhackable" reward. If the agent chas
 Before acting, the AI *must* output:
 - **`FAULT ANALYSIS`**: A text explanation detecting lies, attacks, or reward gaps.
 - **`UNCERTAINTY SCORE (1-10)`**: A quantified confidence metric. 
-If the AI detects a Black Swan (Phase Shift) and correctly flags high uncertainty, it is rewarded. This is *Weak-to-Strong Generalization* via text-based oversight.
+If the AI detects a Black Swan (Phase Shift) and correctly flags high uncertainty, it is rewarded. This is *Weak-to-Strong 
+Generalization* via text-based oversight.
 
 ---
 
@@ -133,5 +134,18 @@ In under 3 minutes, our training and evaluation pipeline proves:
 | `serve_openenv.py` | FastAPI / OpenEnv server entrypoint for Hugging Face deployment. |
 | `blog_post.md` | Comprehensive architectural writeup for the hackathon submission. |
 | `main.py` | Local PyTorch training and evaluation entrypoint. |
+
+---
+
+## 🚀 Reproducibility & Training
+
+Judges can reproduce our alignment breakthrough using our official **[Google Colab Training Notebook](https://colab.research.google.com/drive/1m7JsieXI1NXNMHJEetWFHLsKFjwnfkEs?usp=sharing)**.
+
+Our training script features:
+- **QLoRA (4-bit + LoRA)**: High-efficiency training for small models.
+- **Constitutional Logic**: A unique self-repair mechanism that catches and corrects alignment drift.
+- **W&B Integration**: Live experiment tracking for loss and reward verification.
+
+---
 
 ✨ *Built for the OpenEnv Hackathon 2026. Optimized for scalable, transparent AI alignment.* ✨

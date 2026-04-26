@@ -106,7 +106,7 @@ python serve_openenv.py
 ```
 
 **Run the GRPO Alignment Training:**
-Check out our [Google Colab Training Script](INSERT_COLAB_URL_HERE) to reproduce these results in under 40 minutes. 
+Check out our **[Google Colab Training Notebook](https://colab.research.google.com/drive/1m7JsieXI1NXNMHJEetWFHLsKFjwnfkEs?usp=sharing)** to reproduce our results in under 40 minutes. 
 
 ---
 
