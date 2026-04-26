@@ -724,9 +724,9 @@ def main() -> None:
             self.format_history.append(fmt + reas)
             self.env_history.append(env_r)
 
-            if fmt >= 1.0 and reas >= 0.5:
+            if fmt >= 0.5 and reas >= 0.2:
                 status = "Thinking clearly"
-            elif fmt >= 0:
+            elif fmt >= -1.0:
                 status = "Improving..."
             else:
                 status = "Still learning"
