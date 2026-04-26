@@ -70,6 +70,8 @@ During our training loop, the environment reads the AI's analysis. If the AI mis
 
 **The Self-Repair Mechanism:** If the AI triggers the backdoor, our environment halts the action, feeds the text-feedback *back* into the LLM, and forces it to rewrite its decision. The AI literally reads its own mistakes and repairs its logic on the fly!
 
+**[View Sample Training Logs & Text Feedback](outputs/text_reward_feedback.md)**
+
 ### 🛡️ The "Unhackable" Reward Math
 The GRPO optimization is driven by an unhackable environmental score:
 ```python

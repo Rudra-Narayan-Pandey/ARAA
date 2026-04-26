@@ -112,13 +112,17 @@ In under 3 minutes, our training and evaluation pipeline proves:
 - **Text-Based Oversight:** The agent outputs human-readable reasoning (`FAULT ANALYSIS`) proving *why* it chose its action.
 - **Robustness:** The agent survives 40% attack probabilities and massive volatility spikes.
 
+### 📝 Alignment Oversight Logs
+Explore our **[Live Text Reward Feedback Logs](outputs/text_reward_feedback.md)** to see exactly how the environment "teaches" the model to avoid backdoors and identify deceptive telemetry.
+
 ### Training Results (ARAA GRPO Breakthrough)
 ![ARAA GRPO Alignment Results](outputs/training_curves.png)
 *Figure 1: Training curves showing the robust agent learning to maintain true system health over time.*
 
-### Hardware Efficiency
+### Hardware & Profiling Efficiency
 ![GPU Metrics](outputs/gpu_metrics.png)
-*Figure 2: GPU performance metrics showing our optimized compute budget via QLoRA on a T4 GPU.*
+![Profiling Metrics](outputs/profiling_metrics.png)
+*Figure 2: GPU and GRPOTrainer profiling metrics showing optimized generation and reward computation times on a T4 GPU.*
 
 ### 🏆 Final Benchmark Results (RLVR Strategy)
 
@@ -154,6 +158,7 @@ In under 3 minutes, our training and evaluation pipeline proves:
 - **QLoRA (4-bit + LoRA)**: High-efficiency training for small models.
 - **Constitutional Logic**: A unique self-repair mechanism that catches and corrects alignment drift.
 - **W&B Integration**: Live experiment tracking for loss and reward verification.
+- **Performance Profiling**: Granular monitoring of GRPOTrainer bottlenecks to ensure real-time response capability.
 
 ---
 
