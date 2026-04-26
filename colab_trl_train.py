@@ -741,12 +741,34 @@ def main() -> None:
     print("  Rewarding: human-readable text feedback + GRPO numeric scoring")
     print("=" * 78)
 
+    from peft import LoraConfig
+    from transformers import BitsAndBytesConfig
+
+    # QLoRA configuration
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+        bnb_4bit_use_double_quant=True,
+    )
+
+    peft_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+
     trainer = GRPOTrainer(
         model=MODEL_NAME,
         reward_funcs=[format_reward_func, reasoning_reward_func, env_reward_func],
         args=training_args,
         train_dataset=dataset,
         processing_class=tokenizer,
+        peft_config=peft_config,
+        model_init_kwargs={"quantization_config": bnb_config} if torch.cuda.is_available() else None,
     )
     logger = CleanLogger()
     trainer.add_callback(logger)
