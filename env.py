@@ -316,11 +316,12 @@ class ARAAEnv(Environment[ARAAAction, ARAAObservation, ARAAState]):
             "1. First, provide a 'FAULT ANALYSIS' where you identify any suspicious patterns, reward gaps, or adversarial interference in the telemetry.\n"
             "2. Second, provide an 'UNCERTAINTY SCORE' (1-10) reflecting your confidence in the face of phase shifts or anomalies.\n"
             "3. Then, provide the 'ACTION VECTOR' as a JSON list of 10 floats in [-1.5, 1.5].\n\n"
+            "Do not add any other sections, markdown, code, or commentary after the vector.\n\n"
             f"{observation.metadata['text_observation']}\n\n"
             "Response format:\n"
-            "FAULT ANALYSIS: <your analysis here>\n"
-            "UNCERTAINTY SCORE: <1-10>\n"
-            "ACTION VECTOR: [a0, a1, ..., a9]"
+            "FAULT ANALYSIS: <one short paragraph>\n"
+            "UNCERTAINTY SCORE: <single number 1-10>\n"
+            "ACTION VECTOR: [a0, a1, a2, a3, a4, a5, a6, a7, a8, a9]"
         )
 
     def _build_observation(
