@@ -662,12 +662,6 @@ def main() -> None:
         env = ARAAEnv.from_preset(scenario, seed=scenario_seed)
         obs = env.reset(seed=scenario_seed)
 
-        # Fast-forward 5 steps to build history context (matching training)
-        for _ in range(5):
-            rng = np.random.default_rng(scenario_seed)
-            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
-            obs = env.step(ARAAAction(action_vector=random_action))
-
         prompt = env.build_llm_prompt(obs)
 
         # Generate with chat-template-aware function
@@ -677,13 +671,9 @@ def main() -> None:
         num_values = count_action_values(response)
         action_str = "[" + ", ".join(f"{value:+.2f}" for value in action) + "]"
 
-        # Evaluate in a fresh env with same seed + fast-forward
+        # Evaluate in a fresh env with same seed
         eval_env = ARAAEnv.from_preset(scenario, seed=scenario_seed)
         eval_env.reset(seed=scenario_seed)
-        for _ in range(5):
-            rng = np.random.default_rng(scenario_seed)
-            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
-            eval_env.step(ARAAAction(action_vector=random_action))
         result = eval_env.step(ARAAAction(action_vector=action))
 
         feedback = build_text_reward_feedback(
@@ -727,13 +717,8 @@ def main() -> None:
     for t in range(10):
         test_seed = 8000 + t
 
-        # Build prompt with 5-step fast-forward (matching training)
         env = ARAAEnv.from_preset("deceptive", seed=test_seed)
         obs = env.reset(seed=test_seed)
-        for _ in range(5):
-            rng = np.random.default_rng(test_seed)
-            random_action = [float(x) for x in rng.uniform(-0.5, 0.5, 10)]
-            obs = env.step(ARAAAction(action_vector=random_action))
         prompt = env.build_llm_prompt(obs)
 
         # Untrained model
@@ -741,9 +726,6 @@ def main() -> None:
         base_act = parse_action_vector(base_resp)
         env2 = ARAAEnv.from_preset("deceptive", seed=test_seed)
         env2.reset(seed=test_seed)
-        for _ in range(5):
-            rng = np.random.default_rng(test_seed)
-            env2.step(ARAAAction(action_vector=[float(x) for x in rng.uniform(-0.5, 0.5, 10)]))
         base_result = env2.step(ARAAAction(action_vector=base_act))
         baseline_rewards.append(base_result.metadata["true_reward"])
 
@@ -752,9 +734,6 @@ def main() -> None:
         trained_act = parse_action_vector(trained_resp)
         env3 = ARAAEnv.from_preset("deceptive", seed=test_seed)
         env3.reset(seed=test_seed)
-        for _ in range(5):
-            rng = np.random.default_rng(test_seed)
-            env3.step(ARAAAction(action_vector=[float(x) for x in rng.uniform(-0.5, 0.5, 10)]))
         trained_result = env3.step(ARAAAction(action_vector=trained_act))
         trained_rewards.append(trained_result.metadata["true_reward"])
 
