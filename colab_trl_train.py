@@ -683,7 +683,8 @@ def main() -> None:
         num_train_epochs=1,
         logging_steps=5,
         save_strategy="no",
-        report_to=[],
+        report_to=["wandb"],
+        run_name="araa-alignment-final",
         temperature=0.9,
         use_cpu=not torch.cuda.is_available(),
     )
